@@ -461,7 +461,6 @@ public class ValkeyGlideSetCommands implements ValkeySetCommands {
 			closed = true;
 			finished = true;
 			members.clear();
-			currentIndex = 0;
 		}
 
 		@Override

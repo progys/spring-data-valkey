@@ -195,13 +195,15 @@ class ValkeyGlideScanCursorUnitTests {
 		ValkeyGlideSetCommands commands = new ValkeyGlideSetCommands(new ValkeyGlideConnection(client, null));
 
 		Cursor<byte[]> cursor = commands.sScan("set".getBytes(), scanOptions());
-		assertThat(cursor.hasNext()).isTrue();
+		assertThat(cursor.next()).isEqualTo("member:1".getBytes());
 
 		cursor.close();
 
 		// close() must stop hasNext() paging, even with a member still buffered
 		assertThat(cursor.hasNext()).isFalse();
 		verify(client, times(1)).customCommand(any(GlideString[].class));
+		// close() must not rewind the reported position
+		assertThat(cursor.getPosition()).isEqualTo(1);
 	}
 
 	@Test // GH-111
@@ -213,13 +215,15 @@ class ValkeyGlideScanCursorUnitTests {
 		ValkeyGlideHashCommands commands = new ValkeyGlideHashCommands(new ValkeyGlideConnection(client, null));
 
 		Cursor<Map.Entry<byte[], byte[]>> cursor = commands.hScan("hash".getBytes(), scanOptions());
-		assertThat(cursor.hasNext()).isTrue();
+		cursor.next();
 
 		cursor.close();
 
 		// close() must stop hasNext() paging, even with an entry still buffered
 		assertThat(cursor.hasNext()).isFalse();
 		verify(client, times(1)).customCommand(any(GlideString[].class));
+		// close() must not rewind the reported position
+		assertThat(cursor.getPosition()).isEqualTo(1);
 	}
 
 	private static void assertKeyScanTerminates(Object[] reply) throws Exception {
