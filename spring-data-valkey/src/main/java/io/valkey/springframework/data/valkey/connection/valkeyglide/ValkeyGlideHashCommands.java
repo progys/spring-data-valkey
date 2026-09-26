@@ -422,7 +422,6 @@ public class ValkeyGlideHashCommands implements ValkeyHashCommands {
 			closed = true;
 			finished = true;
 			entries.clear();
-			currentIndex = 0;
 		}
 
 		@Override
