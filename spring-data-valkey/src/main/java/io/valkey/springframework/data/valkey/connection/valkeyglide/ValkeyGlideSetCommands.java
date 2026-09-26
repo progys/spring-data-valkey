@@ -378,6 +378,8 @@ public class ValkeyGlideSetCommands implements ValkeySetCommands {
 
 		private boolean finished = false;
 
+		private boolean closed = false;
+
 		public ValkeyGlideSetScanCursor(byte[] key, ScanOptions options, ValkeyGlideConnection connection) {
 			this.key = key;
 			this.options = options;
@@ -387,6 +389,9 @@ public class ValkeyGlideSetCommands implements ValkeySetCommands {
 
 		@Override
 		public boolean hasNext() {
+			if (closed) {
+				return false;
+			}
 			while (!finished && currentIndex >= members.size()) {
 				scanNext();
 			}
@@ -453,7 +458,9 @@ public class ValkeyGlideSetCommands implements ValkeySetCommands {
 
 		@Override
 		public void close() {
-			// No resources to close for this implementation
+			closed = true;
+			finished = true;
+			members.clear();
 		}
 
 		@Override

@@ -331,6 +331,8 @@ public class ValkeyGlideHashCommands implements ValkeyHashCommands {
 
 		private boolean finished = false;
 
+		private boolean closed = false;
+
 		public ValkeyGlideHashScanCursor(byte[] key, ScanOptions options, ValkeyGlideConnection connection) {
 			this.key = key;
 			this.options = options;
@@ -340,6 +342,9 @@ public class ValkeyGlideHashCommands implements ValkeyHashCommands {
 
 		@Override
 		public boolean hasNext() {
+			if (closed) {
+				return false;
+			}
 			while (!finished && currentIndex >= entries.size()) {
 				scanNext();
 			}
@@ -414,7 +419,9 @@ public class ValkeyGlideHashCommands implements ValkeyHashCommands {
 
 		@Override
 		public void close() {
-			// No resources to close for this implementation
+			closed = true;
+			finished = true;
+			entries.clear();
 		}
 
 		@Override
