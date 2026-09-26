@@ -18,6 +18,7 @@ package io.valkey.springframework.data.valkey.connection.valkeyglide;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -295,6 +296,11 @@ public class ValkeyGlideKeyCommands implements ValkeyKeyCommands {
 					// Convert keys result
 					List<byte[]> keys = ValkeyGlideConverters.toBytesList(keysResult);
 					currentBatch = keys.iterator();
+				}
+				else {
+					// Malformed page: terminate, do not page forever
+					finished = true;
+					currentBatch = Collections.emptyIterator();
 				}
 			}
 			catch (Exception ex) {

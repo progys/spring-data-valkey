@@ -23,6 +23,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import glide.api.models.GlideString;
 import glide.api.models.configuration.RequestRoutingConfiguration.ByAddressRoute;
@@ -139,6 +140,69 @@ class ValkeyGlideScanCursorUnitTests {
 
 		verify(client, times(3)).customCommand(any(GlideString[].class));
 		verify(client, times(3)).setOneShotRouteForNextCommand(route);
+	}
+
+	@Test // GH-108
+	void sScanTerminatesOnMalformedPage() throws Exception {
+
+		UnifiedGlideClient client = mock(UnifiedGlideClient.class);
+		AtomicInteger calls = new AtomicInteger();
+		when(client.customCommand(any(GlideString[].class))).thenAnswer(invocation -> {
+			// Fail fast rather than hang if the guard is ever removed
+			if (calls.incrementAndGet() > 5) {
+				throw new IllegalStateException("SSCAN paging did not terminate");
+			}
+			return null;
+		});
+		ValkeyGlideConnection connection = new ValkeyGlideConnection(client, null);
+		ValkeyGlideSetCommands commands = new ValkeyGlideSetCommands(connection);
+
+		Cursor<byte[]> cursor = commands.sScan("set".getBytes(), scanOptions());
+		assertThat(cursor.hasNext()).isFalse();
+		assertThat(calls.get()).isEqualTo(1);
+
+		cursor.close();
+	}
+
+	@Test // GH-108
+	void hScanTerminatesOnMalformedPage() throws Exception {
+
+		UnifiedGlideClient client = mock(UnifiedGlideClient.class);
+		AtomicInteger calls = new AtomicInteger();
+		when(client.customCommand(any(GlideString[].class))).thenAnswer(invocation -> {
+			// Fail fast rather than hang if the guard is ever removed
+			if (calls.incrementAndGet() > 5) {
+				throw new IllegalStateException("HSCAN paging did not terminate");
+			}
+			return null;
+		});
+		ValkeyGlideConnection connection = new ValkeyGlideConnection(client, null);
+		ValkeyGlideHashCommands commands = new ValkeyGlideHashCommands(connection);
+
+		Cursor<Map.Entry<byte[], byte[]>> cursor = commands.hScan("hash".getBytes(), scanOptions());
+		assertThat(cursor.hasNext()).isFalse();
+		assertThat(calls.get()).isEqualTo(1);
+
+		cursor.close();
+	}
+
+	@Test // GH-108
+	void closeStopsSetAndHashPaging() throws Exception {
+
+		UnifiedGlideClient client = mock(UnifiedGlideClient.class);
+		when(client.customCommand(any(GlideString[].class)))
+				.thenReturn(new Object[] { GlideString.of("17"), new Object[] {} });
+		ValkeyGlideConnection connection = new ValkeyGlideConnection(client, null);
+
+		Cursor<byte[]> setCursor = new ValkeyGlideSetCommands(connection).sScan("set".getBytes(), scanOptions());
+		Cursor<Map.Entry<byte[], byte[]>> hashCursor = new ValkeyGlideHashCommands(connection).hScan("hash".getBytes(),
+				scanOptions());
+
+		setCursor.close();
+		hashCursor.close();
+
+		assertThat(setCursor.hasNext()).isFalse();
+		assertThat(hashCursor.hasNext()).isFalse();
 	}
 
 	private static ScanOptions scanOptions() {

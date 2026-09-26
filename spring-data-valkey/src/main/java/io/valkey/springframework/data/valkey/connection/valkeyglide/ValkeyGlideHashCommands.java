@@ -375,7 +375,9 @@ public class ValkeyGlideHashCommands implements ValkeyHashCommands {
 				}
 
 				connection.execute("HSCAN", (Object[] glideResult) -> {
-					if (glideResult == null) {
+					if (glideResult == null || glideResult.length < 2) {
+						// Malformed page: terminate, do not page forever
+						finished = true;
 						return null;
 					}
 
@@ -410,7 +412,8 @@ public class ValkeyGlideHashCommands implements ValkeyHashCommands {
 
 		@Override
 		public void close() {
-			// No resources to close for this implementation
+			// Allows a concurrent close() to break the hasNext() paging loop
+			finished = true;
 		}
 
 		@Override

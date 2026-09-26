@@ -18,9 +18,12 @@ package io.valkey.springframework.data.valkey.connection.valkeyglide;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 import glide.api.models.GlideString;
 
@@ -56,6 +59,45 @@ class ValkeyGlideKeyCommandsUnitTests {
 		}
 
 		verify(client, times(3)).customCommand(any(GlideString[].class));
+	}
+
+	@Test // GH-108
+	void scanTerminatesOnMalformedPage() throws Exception {
+
+		UnifiedGlideClient client = mock(UnifiedGlideClient.class);
+		AtomicInteger calls = new AtomicInteger();
+		when(client.customCommand(any(GlideString[].class))).thenAnswer(invocation -> {
+			// Fail fast rather than hang if the guard is ever removed
+			if (calls.incrementAndGet() > 5) {
+				throw new IllegalStateException("SCAN paging did not terminate");
+			}
+			return null;
+		});
+		ValkeyGlideConnection connection = new ValkeyGlideConnection(client, null);
+		ValkeyGlideKeyCommands commands = new ValkeyGlideKeyCommands(connection);
+
+		try (Cursor<byte[]> cursor = commands.scan(ScanOptions.scanOptions().match("key:*").build())) {
+			assertThat(cursor.hasNext()).isFalse();
+			assertThat(cursor.hasNext()).isFalse();
+		}
+
+		assertThat(calls.get()).isEqualTo(1);
+	}
+
+	@Test // GH-108
+	void closeStopsScanPaging() throws Exception {
+
+		UnifiedGlideClient client = mock(UnifiedGlideClient.class);
+		when(client.customCommand(any(GlideString[].class)))
+			.thenReturn(new Object[] { GlideString.of("17"), new Object[] {} });
+		ValkeyGlideConnection connection = new ValkeyGlideConnection(client, null);
+		ValkeyGlideKeyCommands commands = new ValkeyGlideKeyCommands(connection);
+
+		Cursor<byte[]> cursor = commands.scan(ScanOptions.scanOptions().match("key:*").build());
+		cursor.close();
+
+		assertThat(cursor.hasNext()).isFalse();
+		verify(client, never()).customCommand(any(GlideString[].class));
 	}
 
 }
